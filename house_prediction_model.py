@@ -2,95 +2,80 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error,mean_squared_error 
-from sklearn.metrics import mean_squared_error, r2_score
+import pickle
 
-df=pd.read_csv("C:\\SOFTWARE_BUG_PREDICTION\\s_b_p\\DATASET\\House_prediction_model\\bengaluru_house_prices.csv")
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# printing the first 5 element 
-df.head()
+df = pd.read_csv("C:\\SOFTWARE_BUG_PREDICTION\\s_b_p\\DATASET\\House_prediction_model\\bengaluru_house_prices.csv")
 
+print(df.head())
+print(df.info())
 
 def convert_sqft(x):
     try:
-        if '-' in str(x):
+        if isinstance(x, str) and '-' in x:
             a, b = x.split('-')
             return (float(a) + float(b)) / 2
         return float(x)
     except:
-        return None
+        return np.nan
 
-df['total_sqft'] = df['total_sqft'].apply(convert_sqft)  
+df['total_sqft'] = df['total_sqft'].apply(convert_sqft)
 
-df = pd.get_dummies(df, drop_first=True) 
+df = pd.get_dummies(df, drop_first=True)
 
-
-# Drop again if new NaN created
 df = df.dropna()
 
-# checking the null value 
-df.isnull().sum()
+print(df.shape)
 
+X = df.drop('price', axis=1)
+y = df['price']
 
-df.dropna()
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42
+)
 
-print(df.isnull().sum())
+scaler = StandardScaler()
 
-print(df.shape) 
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
-# imbalance dataset
+models = {
+    "Linear Regression": LinearRegression(),
+    "Ridge": Ridge(),
+    "Lasso": Lasso()
+}
 
-df['price'].value_counts()
+results = {}
 
-print(df.info()) 
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
 
-# correlation with bugs
-corr=df.corr()['price'].sort_values(ascending=False)
-print(df.corr()['price'].sort_values(ascending=False))
+    results[name] = {
+        "Train R2": model.score(X_train, y_train),
+        "Test R2": r2_score(y_test, y_pred),
+        "MAE": mean_absolute_error(y_test, y_pred),
+        "RMSE": np.sqrt(mean_squared_error(y_test, y_pred))
+    }
 
+results_df = pd.DataFrame(results).T
+print(results_df)
 
-selected_features = corr[corr >= 0.5]
-print(selected_features) 
+best_model = LinearRegression()
+best_model.fit(X_train, y_train)
+y_pred = best_model.predict(X_test)
 
-selected_columns = selected_features.index
-print(selected_columns) 
+plt.figure(figsize=(6,6))
+plt.scatter(y_test, y_pred, alpha=0.5)
+plt.xlabel("Actual Price")
+plt.ylabel("Predicted Price")
+plt.title("Actual vs Predicted Prices")
+plt.show()
 
-x = df[selected_columns].drop('price', axis=1)
-y=df['price']
+pickle.dump(best_model, open('house_price_model.pkl', 'wb'))
 
-
-# Train and test split 
-from sklearn.model_selection import train_test_split
-x_train,x_test,y_train,y_test=train_test_split(x,y,test_size=0.25,random_state=42)
-
-
-
-
-
-model = LinearRegression()
-model.fit(x_train, y_train)
-
-
-y_pred = model.predict(x_test)
-
-
-
-rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-r2 = r2_score(y_test, y_pred)
-
-print("Accuracy (R2 Score):", r2)
-print("RMSE:", rmse)
-print(y.mean()) 
-
-
-
-
-
-
-
-
-
-
-
-
+print("Model saved as house_price_model.pkl")
