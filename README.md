@@ -53,6 +53,4 @@ This project predicts house prices in Bengaluru using Machine Learning (Linear R
 - R² Score (Accuracy)
 - RMSE (Root Mean Squared Error)
 
----
 
-## 📊 Output Example
